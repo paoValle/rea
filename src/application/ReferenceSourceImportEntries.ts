@@ -75,7 +75,10 @@ const failedEntry = (
       classifications,
       limitations: [limitation],
     };
-  if (entry.kind === "unknown")
+  // `other` is a positively observed non-regular entry (FIFO, socket, device).
+  // It has no file representation, so it keeps the unknown kind rather than
+  // becoming an unreadable file.
+  if (entry.kind === "unknown" || entry.kind === "other")
     return {
       path: entry.path,
       kind: "unknown",
@@ -88,7 +91,7 @@ const failedEntry = (
     sha256: null,
     size: entry.size ?? null,
     language: null,
-    classifications: entry.kind === "file" ? classifications : ["unknown"],
+    classifications,
     content_state: "unreadable",
     limitations: [limitation],
   };

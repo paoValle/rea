@@ -1,5 +1,7 @@
+import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
 
@@ -160,6 +162,55 @@ describe("compiled historical-source summary input boundaries", () => {
       expect(result.stdout).toMatch(/detail|outline/u);
     });
   }
+
+  cliTest.skipIf(process.platform === "win32")(
+    "counts a FIFO as an unknown entry instead of an unreadable file",
+    async ({ cli }) => {
+      const root = await createTestTempDirectory("rea-reference-fifo-summary-");
+      await mkdir(join(root, "src"));
+      await writeFile(join(root, "src", "a.ts"), "x\n");
+      await promisify(execFile)("mkfifo", [join(root, "src", "pipe")], {
+        timeout: 2_000,
+      });
+      const result = await cli.run({
+        arguments: [
+          "import-reference-source",
+          root,
+          "--detail",
+          "summary",
+          "--outline-depth",
+          "2",
+          "--json",
+        ],
+        cwd: root,
+      });
+      expect(result.exitCode, result.stdout).toBe(0);
+      expect(result.json).toMatchObject({
+        inventory_state: "partial",
+        counts: {
+          entries: 3,
+          files: 1,
+          directories: 1,
+          symlinks: 0,
+          unknown: 1,
+        },
+        file_content_states: { unreadable: 0 },
+        file_sizes: { known_bytes: "2" },
+        outline: {
+          entries: expect.arrayContaining([
+            expect.objectContaining({ path: "src/a.ts", kind: "file" }),
+            expect.objectContaining({
+              path: "src/pipe",
+              kind: "unknown",
+              limitations: expect.arrayContaining([
+                expect.stringContaining("Entry is not a regular file"),
+              ]),
+            }),
+          ]),
+        },
+      });
+    },
+  );
 
   cliTest(
     "preserves the missing-root failure in summary mode",

@@ -90,6 +90,10 @@ describe("reference import native entry failure details", () => {
       const entry = imported.value.entries.find(
         (item) => item.path === "events.pipe",
       );
+      expect(entry).toMatchObject({
+        kind: "unknown",
+        classifications: ["unknown"],
+      });
       expect(entry?.limitations.join(" ")).toContain(
         "Entry is not a regular file",
       );
